@@ -200,6 +200,19 @@
             </div>
         </div>
     </div>
+
+    <!-- Debug Information -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+        <div class="px-6 py-4 bg-gray-50 border-b">
+            <h2 class="text-xl font-bold text-gray-800">Detection Debugging</h2>
+        </div>
+        <div class="p-6">
+            <h3 class="text-md font-semibold text-gray-700 mb-4">API Response</h3>
+            <div id="api-response" class="bg-gray-50 p-4 rounded-lg overflow-auto max-h-[300px] text-xs font-mono">
+                Waiting for API data...
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -226,58 +239,103 @@
                     return;
                 }
                 
+                // Display the raw API response for debugging
+                document.getElementById('api-response').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                // Update detection count
+                document.getElementById('total-detection-count').textContent = data.total_count || 0;
+                
+                // Update last detection time
+                if (data.last_detection_time) {
+                    document.getElementById('last-detection-time').textContent = data.last_detection_time;
+                }
+                
                 // Update queue size
-                document.getElementById('queue-size').textContent = data.queue_size || 0;
+                document.getElementById('queue-size').textContent = data.status.queue_size || 0;
                 
                 // Update detection thread status
                 const threadStatus = document.getElementById('detection-thread-status');
-                if (data.worker_running) {
+                if (data.status.detection_thread) {
                     threadStatus.textContent = 'Running';
                     threadStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-green-100 text-green-800';
                 } else {
-                    threadStatus.textContent = 'Stopped';
-                    threadStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-red-100 text-red-800';
+                    threadStatus.textContent = 'Restarting...';
+                    threadStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800';
+                    // We'll show "restarting" briefly as the API should restart the thread
                 }
                 
-                // Update detections table
+                // Update the database thread status if we have an element for it
+                const dbThreadStatus = document.getElementById('db-thread-status');
+                if (dbThreadStatus) {
+                    if (data.status.db_thread) {
+                        dbThreadStatus.textContent = 'Running';
+                        dbThreadStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-green-100 text-green-800';
+                    } else {
+                        dbThreadStatus.textContent = 'Restarting...';
+                        dbThreadStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800';
+                    }
+                }
+                
+                // Update detections table - logging what we're getting
+                console.log("Detections data:", data.detections);
+                
+                // Get the detections table or container
+                const detectionsTable = document.querySelector('.detections-table');
+                const tbody = detectionsTable ? detectionsTable.querySelector('tbody') : null;
+                
                 if (data.detections && data.detections.length > 0) {
-                    let tableHtml = `
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Object</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                    `;
+                    if (!detectionsTable) {
+                        // If there's no table yet, create one
+                        const tableContainer = document.getElementById('detections-table');
+                        tableContainer.innerHTML = `
+                            <table class="min-w-full divide-y divide-gray-200 detections-table">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Object</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                            </table>
+                        `;
+                        
+                        // Get the newly created tbody
+                        tbody = document.querySelector('.detections-table tbody');
+                    }
                     
-                    data.detections.forEach(detection => {
-                        tableHtml += `
-                            <tr>
+                    if (tbody) {
+                        // Clear existing rows
+                        tbody.innerHTML = '';
+                        
+                        // Add new rows
+                        data.detections.forEach(detection => {
+                            console.log("Processing detection:", detection);
+                            const row = document.createElement('tr');
+                            row.className = 'hover:bg-gray-50';
+                            
+                            // Format the row
+                            row.innerHTML = `
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${detection.object_name}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${detection.confidence}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${detection.timestamp}</td>
-                            </tr>
-                        `;
-                    });
-                    
-                    tableHtml += `
-                            </tbody>
-                        </table>
-                    `;
-                    
-                    document.getElementById('detections-table').innerHTML = tableHtml;
+                            `;
+                            
+                            tbody.appendChild(row);
+                        });
+                    }
                 } else {
-                    document.getElementById('detections-table').innerHTML = `
+                    // Display no detections message
+                    const tableContainer = document.getElementById('detections-table');
+                    tableContainer.innerHTML = `
                         <div class="text-center py-8">
                             <p class="text-gray-500 text-md">No detections yet. Point your camera at some objects to start detecting!</p>
                         </div>
                     `;
                 }
                 
-                // Update object type statistics
+                // Update object type counts
                 const objectStats = document.getElementById('object-stats');
                 if (data.type_counts && Object.keys(data.type_counts).length > 0) {
                     let statsHtml = '';
@@ -307,57 +365,45 @@
                     `;
                 }
                 
-                // Update user info with total detections
-                if (data.total_count !== undefined) {
-                    // Update User Info total detection count - find by ID
-                    document.getElementById('total-detection-count').textContent = data.total_count;
-                }
-                
-                // Update last detection time if available
-                if (data.detections && data.detections.length > 0) {
-                    document.getElementById('last-detection-time').textContent = data.detections[0].timestamp;
-                }
-                
-                // Update timestamp
-                document.getElementById('last-updated').textContent = new Date().toLocaleString();
+                stopRefreshAnimation();
             })
             .catch(error => {
-                console.error('Error updating detections:', error);
-            })
-            .finally(() => {
+                console.error('Error:', error);
                 stopRefreshAnimation();
             });
     }
+    
+    // First call immediately
+    updateDetections();
+    
+    // Then refresh every 3 seconds
+    setInterval(updateDetections, 3000);
     
     // Function to check camera status
     function checkCameraStatus() {
         fetch('/api/check-camera')
             .then(response => response.json())
             .then(data => {
-                const statusElement = document.getElementById('camera-status');
-                
+                const cameraStatus = document.getElementById('camera-status');
                 if (data.status === 'ok') {
-                    statusElement.textContent = 'Connected';
-                    statusElement.className = 'font-medium px-2 py-1 rounded-full text-xs bg-green-100 text-green-800';
-                } else if (data.status === 'not_initialized' || data.status === 'closed') {
-                    statusElement.textContent = 'Disconnected';
-                    statusElement.className = 'font-medium px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800';
+                    cameraStatus.textContent = 'Connected';
+                    cameraStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-green-100 text-green-800';
                 } else {
-                    statusElement.textContent = 'Error';
-                    statusElement.className = 'font-medium px-2 py-1 rounded-full text-xs bg-red-100 text-red-800';
+                    cameraStatus.textContent = data.status === 'error' ? 'Error' : 'Disconnected';
+                    cameraStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-red-100 text-red-800';
                 }
             })
             .catch(error => {
-                console.error('Error checking camera status:', error);
-                const statusElement = document.getElementById('camera-status');
-                statusElement.textContent = 'Error';
-                statusElement.className = 'font-medium px-2 py-1 rounded-full text-xs bg-red-100 text-red-800';
+                console.error('Error checking camera:', error);
+                const cameraStatus = document.getElementById('camera-status');
+                cameraStatus.textContent = 'Error';
+                cameraStatus.className = 'font-medium px-2 py-1 rounded-full text-xs bg-red-100 text-red-800';
             });
     }
     
-    // Function to add a test detection
-    function addTestDetection() {
-        const button = document.getElementById('test-detection-btn');
+    // Add test detection functionality
+    document.getElementById('test-detection-btn').addEventListener('click', function() {
+        const button = this;
         const originalText = button.textContent;
         
         // Disable button and show loading
@@ -406,29 +452,15 @@
             button.disabled = false;
             button.textContent = originalText;
         });
-    }
-    
-    // Set up event listeners
-    document.addEventListener('DOMContentLoaded', function() {
-        // Refresh buttons
-        const refreshBtn = document.getElementById('refresh-btn');
-        refreshBtn.addEventListener('click', updateDetections);
-        
-        const refreshDashboardBtn = document.getElementById('refresh-dashboard-btn');
-        refreshDashboardBtn.addEventListener('click', function() {
-            window.location.reload();
-        });
-        
-        // Test detection button
-        const testDetectionBtn = document.getElementById('test-detection-btn');
-        testDetectionBtn.addEventListener('click', addTestDetection);
-        
-        // Initial status checks
-        checkCameraStatus();
-        
-        // Set up auto-refresh
-        setInterval(updateDetections, 5000);
-        setInterval(checkCameraStatus, 10000);
     });
+    
+    // Refresh dashboard button
+    document.getElementById('refresh-dashboard-btn').addEventListener('click', function() {
+        window.location.reload();
+    });
+    
+    // Check camera status immediately and then every 5 seconds
+    checkCameraStatus();
+    setInterval(checkCameraStatus, 5000);
 </script>
 {% endblock %} 

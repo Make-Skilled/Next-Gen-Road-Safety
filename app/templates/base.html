@@ -3,45 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{% endblock %} - Object Detection</title>
+    <meta name="description" content="Next-Gen Road Safety - Advanced real-time object detection for enhanced road safety">
+    <meta name="keywords" content="road safety, object detection, YOLO, computer vision, traffic monitoring">
+    <title>{% block title %}{% endblock %} - Next-Gen Road Safety</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .bg-gradient {
+            background: linear-gradient(135deg, #4f46e5 0%, #1e40af 100%);
+        }
+        
+        .shadow-blue {
+            box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.2);
+        }
+        
+        /* Animation for the notification dot */
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            70% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+        .animate-pulse-slow {
+            animation: pulse 2s infinite;
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <nav class="bg-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="{{ url_for('index') }}" class="text-xl font-bold text-gray-800">Object Detection</a>
-                    </div>
-                </div>
                 <div class="flex items-center">
-                    {% if current_user.is_authenticated %}
-                        <a href="{{ url_for('dashboard') }}" class="text-gray-700 hover:text-gray-900 px-3 py-2">Dashboard</a>
-                        <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md ml-4">Logout</a>
-                    {% else %}
-                        <a href="{{ url_for('login') }}" class="text-gray-700 hover:text-gray-900 px-3 py-2">Login</a>
-                        <a href="{{ url_for('signup') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md ml-4">Sign Up</a>
-                    {% endif %}
+                    <a href="{{ url_for('index') }}" class="flex items-center">
+                        <div class="w-10 h-10 rounded-lg bg-gradient flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                            </svg>
+                        </div>
+                        <span class="text-xl font-bold text-gray-900">Next-Gen Road Safety</span>
+                    </a>
                 </div>
+                
+                <nav class="flex items-center space-x-6">
+                    <a href="{{ url_for('index') }}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium">Home</a>
+                    
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('dashboard') }}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium flex items-center">
+                            <span>Dashboard</span>
+                            {% if current_user.is_authenticated %}
+                                <span class="ml-2 w-2 h-2 rounded-full bg-green-500 animate-pulse-slow"></span>
+                            {% endif %}
+                        </a>
+                        <div class="flex items-center ml-3">
+                            <span class="text-sm text-gray-500 mr-4">Hi, {{ current_user.username }}</span>
+                            <a href="{{ url_for('logout') }}" class="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150">
+                                Logout
+                            </a>
+                        </div>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium">Login</a>
+                        <a href="{{ url_for('signup') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150 shadow-blue">
+                            Sign Up
+                        </a>
+                    {% endif %}
+                </nav>
             </div>
         </div>
-    </nav>
+    </header>
 
     {% with messages = get_flashed_messages() %}
         {% if messages %}
-            <div class="max-w-7xl mx-auto px-4 mt-4">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
                 {% for message in messages %}
-                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                        <span class="block sm:inline">{{ message }}</span>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md" role="alert">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-yellow-700">{{ message }}</p>
+                            </div>
+                        </div>
                     </div>
                 {% endfor %}
             </div>
         {% endif %}
     {% endwith %}
 
-    <main class="max-w-7xl mx-auto px-4 py-6">
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% block content %}{% endblock %}
     </main>
+    
+    <footer class="bg-white border-t border-gray-200 mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between">
+                <div class="mb-4 md:mb-0">
+                    <a href="{{ url_for('index') }}" class="flex items-center">
+                        <div class="w-8 h-8 rounded-lg bg-gradient flex items-center justify-center mr-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                            </svg>
+                        </div>
+                        <span class="text-gray-900 font-semibold">Next-Gen Road Safety</span>
+                    </a>
+                </div>
+                <div class="text-center md:text-right text-sm text-gray-500">
+                    <p>© 2025 Next-Gen Road Safety. All rights reserved.</p>
+                    <p class="mt-1">Powered by YOLO object detection technology.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
 </body>
 </html> 

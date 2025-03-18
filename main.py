@@ -369,9 +369,9 @@ def detection_worker():
                         if len(boxes) > 0 and user_id is not None and (current_time - last_detection_time) >= detection_cooldown:
                             logger.info(f"Processing {len(boxes)} detections with cooldown passed. User ID: {user_id}")
                             
-                            # Find the detection with highest confidence
-                            best_detection = None
-                            highest_confidence = 0
+                            # Process all detections above the threshold
+                            valid_detections = []
+                            confidence_threshold = 0.35  # Min confidence threshold
                             
                             for box in boxes:
                                 confidence = float(box.conf[0])
@@ -381,27 +381,32 @@ def detection_worker():
                                 if frame_count % detection_log_interval == 0:
                                     logger.info(f"Detection: {class_name} with confidence {confidence:.2f}")
                                 
-                                # Track highest confidence detection
-                                if confidence > highest_confidence and confidence >= 0.35:  # Threshold
-                                    highest_confidence = confidence
-                                    best_detection = {
+                                # Add any detection above threshold to our list
+                                if confidence >= confidence_threshold:
+                                    valid_detections.append({
                                         'class_name': class_name,
                                         'confidence': confidence
-                                    }
+                                    })
                             
-                            # Save best detection if above threshold
-                            if best_detection is not None:
-                                logger.info(f"Queueing best detection: {best_detection['class_name']} with confidence {best_detection['confidence']:.2f}")
-                                success = queue_detection(
-                                    user_id, 
-                                    best_detection['class_name'], 
-                                    best_detection['confidence']
-                                )
-                                if success:
-                                    logger.info(f"Successfully queued detection: {best_detection['class_name']}")
+                            # Save all valid detections
+                            if valid_detections:
+                                saved_count = 0
+                                for detection in valid_detections:
+                                    logger.info(f"Queueing detection: {detection['class_name']} with confidence {detection['confidence']:.2f}")
+                                    success = queue_detection(
+                                        user_id, 
+                                        detection['class_name'], 
+                                        detection['confidence']
+                                    )
+                                    if success:
+                                        logger.info(f"Successfully queued detection: {detection['class_name']}")
+                                        saved_count += 1
+                                    else:
+                                        logger.error(f"Failed to queue detection: {detection['class_name']}")
+                                
+                                if saved_count > 0:
                                     last_detection_time = current_time
-                                else:
-                                    logger.error(f"Failed to queue detection: {best_detection['class_name']}")
+                                    logger.info(f"Saved {saved_count} detections to queue")
                 
                 # Slight delay to prevent maxing out CPU
                 time.sleep(1/camera_fps)  # Aim for target FPS
@@ -787,6 +792,29 @@ def logout():
 def get_detections():
     """API endpoint for getting detection data"""
     try:
+        # Check if threads are running and restart if needed
+        global detection_thread, db_thread
+        
+        # Check detection thread
+        detection_thread_running = detection_thread is not None and detection_thread.is_alive()
+        if not detection_thread_running:
+            logger.warning("Detection thread not running - attempting to restart")
+            if detection_thread is not None:
+                detection_thread = None
+            detection_thread = threading.Thread(target=detection_worker, daemon=True)
+            detection_thread.start()
+            logger.info("Detection thread restarted")
+        
+        # Check database worker thread
+        db_thread_running = db_thread is not None and db_thread.is_alive()
+        if not db_thread_running:
+            logger.warning("Database worker thread not running - attempting to restart")
+            if db_thread is not None:
+                db_thread = None
+            db_thread = threading.Thread(target=db_worker, daemon=True)
+            db_thread.start()
+            logger.info("Database worker thread restarted")
+        
         with SessionFactory() as session:
             # Check if user exists and is valid
             user = session.query(User).get(current_user.id)
@@ -843,7 +871,12 @@ def get_detections():
                     },
                     'status': {
                         'processed_count': processed_count,
-                    }
+                        'queue_size': detection_queue.qsize(),
+                        'detection_thread': detection_thread_running,
+                        'db_thread': db_thread_running,
+                        'worker_running': not stop_event.is_set()
+                    },
+                    'last_detection_time': detections[0].timestamp.strftime('%Y-%m-%d %H:%M:%S') if detections else 'None'
                 })
             except Exception as query_error:
                 logger.error(f"Error querying detections: {str(query_error)}")
